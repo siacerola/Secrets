@@ -15,6 +15,18 @@ app.use(bodyParser.urlencoded({
 
 const PORT = process.env.PORT || 3000
 
+app.get("/", (req, res) => {
+    res.render("home")
+})
+
+app.get("/login", (req, res) => {
+    res.render("login")
+})
+
+app.get("/register", (req, res) => {
+    res.render("register")
+})
+
 app.listen(PORT, ()=>{
     console.log(`server runing on port ${PORT}`);
 })
