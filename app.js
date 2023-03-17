@@ -61,6 +61,28 @@ app.post("/register",async (req, res) => {
     }
 })
 
+app.post("/login",async (req, res) => {
+    const username = req.body.username
+    const password = req.body.password
+
+    const doc = await User.findOne({
+        email:username
+    }).exec()
+
+    if (username === doc.email) {
+        if (password === doc.password) {
+            console.log(`${doc} is found`);
+            res.render("secrets")
+        } else {
+            console.log(`${password} is wrong password`);
+        }
+        
+    } else {
+        console.log(`${username} not found, please register`);
+    }
+
+})
+
 
 connDB().then(() => {
     app.listen(PORT, ()=>{
