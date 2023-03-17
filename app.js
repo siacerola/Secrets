@@ -24,8 +24,15 @@ const connDB = async () => {
     } catch (error) {
         console.log(`error connection mongoDB :${error}`);
     }
-    
 }
+
+const userSchema = {
+    email: String,
+    password:String
+}
+
+const User = new mongoose.model("User",userSchema)
+
 app.get("/", (req, res) => {
     res.render("home")
 })
@@ -36,6 +43,22 @@ app.get("/login", (req, res) => {
 
 app.get("/register", (req, res) => {
     res.render("register")
+})
+
+app.post("/register",async (req, res) => {
+    const newUser = new User({
+        email: req.body.username,
+        password:req.body.password
+    })
+
+    const saveNewUser = await newUser.save()
+    if (newUser === saveNewUser) {
+        console.log(`${saveNewUser} successfully saved to database`);
+        res.render("secrets")
+    } else {
+        console.log("cant save newUser to database");
+
+    }
 })
 
 
