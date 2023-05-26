@@ -4,13 +4,16 @@ require('dotenv').config()
 const express = require('express')
 const bodyParser = require('body-parser')
 
-const ejs = require('ejs')
-
 const mongoose = require('mongoose')
+const findOrCreate = require('mongoose-findorcreate')
 
 const session = require('express-session')
 const passport = require('passport')
 const passportLocalMongoose = require('passport-local-mongoose')
+
+const GoogleStrategy = require('passport-google-oauth20').Strategy
+
+
 
 const app = express()
 
@@ -23,13 +26,13 @@ app.use(bodyParser.urlencoded({
 }))
 
 app.use(session({
-    secret: "Or little secret.",
+    secret: 'Our little secret.',
     resave: false,
     saveUninitialized:false
 }))
 
 app.use(passport.initialize())
-app.use(passport.session())
+app.use(passport.authenticate('session'))
 
 const PORT = process.env.PORT || 3000
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1/userDB'
@@ -43,60 +46,108 @@ const connDB = async () => {
     }
 }
 
+
 const userSchema = new mongoose.Schema({
     email: String,
-    password:String
+    password: String,
+    googleId:String
 }) 
 
 userSchema.plugin(passportLocalMongoose)
+userSchema.plugin(findOrCreate)
 
 
 
-const User = new mongoose.model("User", userSchema)
+const User = new mongoose.model('User', userSchema)
 
 passport.use(User.createStrategy())
 
-passport.serializeUser(User.serializeUser())
-passport.deserializeUser(User.deserializeUser())
+passport.serializeUser((user, cb) => {
+    process.nextTick(() => {
+        cb(null,
+            {
+                id: user.id,
+                username: user.username,
+                name: user.name
+            });
+    });
+});
 
-app.get("/", (req, res) => {
-    res.render("home")
+
+passport.deserializeUser((user, cb) => {
+    process.nextTick(() => {
+        return cb(null,user)
+    })
 })
 
-app.get("/login", (req, res) => {
-    res.render("login")
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: 'http://localhost:3000/auth/google/secrets',
+    userProfileURL:'https://www.googleapis.com/oauth2/v3/userinfo'
+},
+    (accessToken, refreshToken, profile, cb) => {
+        console.log(profile);
+        User.findOrCreate({
+            googleId:profile.id
+        },
+            (err, user) => {
+            return cb(err,user)
+        })
+    }))
+
+app.get('/', (req, res) => {
+    res.render('home')
 })
 
-app.get("/register", (req, res) => {
-    res.render("register")
+app.get('/auth/google',
+    passport.authenticate('google', {
+        scope:['profile']
+    })
+)
+
+app.get('/auth/google/secrets',
+    passport.authenticate('google', {
+        successRedirect: '/secrets',
+        failureRedirect:'/login'
+    })
+)
+
+app.get('/login', (req, res) => {
+    res.render('login')
 })
 
-app.get("/secrets", (req, res) => {
+app.get('/register', (req, res) => {
+    res.render('register')
+})
+
+app.get('/secrets', (req, res) => {
     if (req.isAuthenticated()) {
-        res.render("secrets")
+        res.render('secrets')
     } else {
-        res.redirect("/login")
+        res.redirect('/login')
     }
 })
 
-app.get("/logout", (req, res) => {
+app.get('/logout', (req, res) => {
     req.logout((err) => {
         if (err) {
             console.log(err);
         } else {
-            res.redirect("/")
+            res.redirect('/')
         }
     })
     
 })
 
-app.post("/register", async (req, res) => {
+app.post('/register', async (req, res) => {
     User.register({ username: req.body.username }, req.body.password, (err, user) => {
         if (err) {
             console.log(err);
-            res.redirect("/register")
+            res.redirect('/register')
         } else {
-            passport.authenticate("local")(req, res, () => {
+            passport.authenticate('local')(req, res, () => {
                 res.redirect('/secrets')
             })
         }
@@ -104,7 +155,7 @@ app.post("/register", async (req, res) => {
     
 })
 
-app.post("/login", async (req, res) => {
+app.post('/login', async (req, res) => {
     const user = new User({
         username: req.body.username,
         password:req.body.password
@@ -114,8 +165,8 @@ app.post("/login", async (req, res) => {
         if (err) {
             console.log(err);
         } else {
-            passport.authenticate("local")(req, res, () => {
-                res.redirect("/secrets")
+            passport.authenticate('local')(req, res, () => {
+                res.redirect('/secrets')
             })
         }
     })
